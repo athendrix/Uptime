@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30717.126
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{ABF9B96D-4215-49B5-9439-D213E1491C38}") = "UptimeClient", "UptimeClient\UptimeClient.csproj", "{6328C93C-B09F-4C89-AF37-6F0402387083}"
+EndProject
+Project("{ABF9B96D-4215-49B5-9439-D213E1491C38}") = "UptimeServer", "UptimeServer\UptimeServer.csproj", "{A260E898-6C21-440A-B123-99A71EAA3D3F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6328C93C-B09F-4C89-AF37-6F0402387083}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6328C93C-B09F-4C89-AF37-6F0402387083}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {84B20752-7ACC-4C85-93AB-C622CC2AFD38}
+	EndGlobalSection
+EndGlobal

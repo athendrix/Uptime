@@ -1,0 +1,12 @@
+#This top one is super important for some reason.
+**/*Client.csproj
+**/.vscode
+**/.dockerignore
+**/.vs
+**/.git
+**/.sln
+**/.code-workspace
+**/.gitignore
+**/packages
+**/bin
+**/obj

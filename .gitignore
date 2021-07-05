@@ -1,0 +1,8 @@
+*/bin
+*/obj
+*.htmlz
+
+#Visual Studio Files
+*.suo
+.vs/
+*.user
