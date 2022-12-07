@@ -53,13 +53,17 @@ namespace UptimeServer.Middleware
         }
         private static async Task<bool> LoadContent(CachedZipHost czh, HttpContext context, string path)
         {
-            if(czh.ContainsContent(path))
+            MemoryStream? ms;
+            if ((ms = czh.GetContent(path)) != null)
             {
-                context.Response.StatusCode = 200;
-                context.Response.ContentType = MimeTypeMap.GetMimeType(Path.GetExtension(path));
-                using MemoryStream ms = czh.GetContent(path);
-                await ms.CopyToAsync(context.Response.Body);
-                return true;
+                using (ms)
+                {
+                    context.Response.StatusCode = 200;
+                    string? ContentType = MimeTypeMap.GetMimeType(Path.GetExtension(path));
+                    if (ContentType != null) { context.Response.ContentType = ContentType; }
+                    await ms.CopyToAsync(context.Response.Body);
+                    return true;
+                }
             }
             return false;
         }

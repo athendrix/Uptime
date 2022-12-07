@@ -637,9 +637,9 @@ namespace UptimeServer.Middleware
             #endregion
         };
 
-        public static string GetMimeType(string extension)
+        public static string? GetMimeType(string extension)
         {
-            if (extension == null) { return null; }
+            //if (extension == null) { return null; }
             extension = extension.Trim().ToLower();
             if (!extension.StartsWith('.'))
             {

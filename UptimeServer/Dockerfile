@@ -21,6 +21,9 @@ RUN dotnet build -c Debug -o /app/build
 FROM build AS publish
 RUN dotnet publish -c Debug -o /app/publish
 
-FROM base AS final
+FROM alpine:latest AS final
+RUN apk add aspnetcore6-runtime
+WORKDIR /app
+EXPOSE 80
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "UptimeServer.dll"]

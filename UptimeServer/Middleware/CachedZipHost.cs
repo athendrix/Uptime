@@ -7,7 +7,7 @@ namespace UptimeServer.Middleware
 {
     public class CachedZipHost
     {
-        private Dictionary<string, byte[]> cachedContent;
+        private Dictionary<string, byte[]>? cachedContent;
         private readonly Func<Stream> streamFunction;
         private readonly bool caseSensitive;
         public CachedZipHost(string path, bool caseSensitive = false):this(()=>new FileStream(path,FileMode.Open),caseSensitive)
@@ -55,11 +55,15 @@ namespace UptimeServer.Middleware
         }
         public bool ContainsContent(string key)
         {
-            return cachedContent.ContainsKey(caseSensitive ? key : key.ToLower());
+            return cachedContent != null ? cachedContent.ContainsKey(caseSensitive ? key : key.ToLower()) : false;
         }
-        public MemoryStream GetContent(string key)
+        public MemoryStream? GetContent(string key)
         {
-            return new MemoryStream(cachedContent[caseSensitive ? key : key.ToLower()], false);
+            if (cachedContent != null && ContainsContent(key))
+            {
+                return new MemoryStream(cachedContent[caseSensitive ? key : key.ToLower()], false);
+            }
+            return null;
         }
     }
 }
