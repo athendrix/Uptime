@@ -24,9 +24,10 @@ namespace UptimeServer
         public static void Reset() => resetServices = true;
         public static ReadOnlyMemory<WebService> GetServices() => WebServices.AsMemory();
 
-        private static Task ServiceTrackingTask = CheckServices();
+        
         private static bool resetServices = true;
         private static WebService[] WebServices = new WebService[0];
+        private static Task ServiceTrackingTask = CheckServices();
         private static async Task CheckServices()
         {
             DateTime Now;
@@ -54,19 +55,20 @@ namespace UptimeServer
                 }
                 try
                 {
-                    ParallelOptions options = new ParallelOptions();
-                    options.MaxDegreeOfParallelism = 5;
-                    Parallel.For(0, WebServices.Length, options, async (i) =>
+                    Task<WebService>[] CheckResults = new Task<WebService>[WebServices.Length];
+                    for(int i = 0; i < WebServices.Length; i++)
                     {
-                        WebServices[i] = WebServices[i].checktype switch
+                        CheckResults[i] = WebServices[i].checktype switch
                         {
-                            CheckType.PING => await CheckPING(WebServices[i], Now),
-                            CheckType.TCP => await CheckTCP(WebServices[i], Now),
-                            CheckType.SSL => await CheckSSL(WebServices[i], Now),
-                            CheckType.HTTP => await CheckHTTP(WebServices[i], Now),
+                            CheckType.PING => CheckPING(WebServices[i], Now),
+                            CheckType.TCP => CheckTCP(WebServices[i], Now),
+                            CheckType.SSL => CheckSSL(WebServices[i], Now),
+                            CheckType.HTTP => CheckHTTP(WebServices[i], Now),
                             _ => throw new NotImplementedException(),
                         };
-                    });
+                    }
+                    await Task.WhenAll(CheckResults);
+                    WebServices = CheckResults.Select(x => x.Result).ToArray();
                 }
                 catch (Exception e)
                 {
@@ -91,7 +93,7 @@ namespace UptimeServer
                 {
                     HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Head, service.address);
                     HttpResponseMessage response = await client.SendAsync(message);
-                    bool ok = response.StatusCode.ToString() == "OK";
+                    bool ok = response.StatusCode == System.Net.HttpStatusCode.OK;
                     bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
                     return service with { live = (ok ? "" : "Error:") + response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = ok ? (prev ? Now : service.checktime) : DateTime.MaxValue };
                 }
@@ -152,7 +154,7 @@ namespace UptimeServer
         }
         private static Task<WebService> CheckSSL(WebService service, DateTime Now)
         {
-            throw new NotImplementedException();
+            return Task.FromResult(service with { live = "Error:Check Not Implemented!", checktime = DateTime.MaxValue });
         }
         private static async Task<WebService> CheckTCP(WebService service, DateTime Now)
         {

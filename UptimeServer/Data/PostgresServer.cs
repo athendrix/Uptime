@@ -12,7 +12,7 @@ namespace UptimeServer.Data
         {
             CSL.DependencyInjection.NpgsqlConnectionConstructor = (x) => new Npgsql.NpgsqlConnection(x);
             CSL.DependencyInjection.NpgsqlConnectionStringConstructor = () => new Npgsql.NpgsqlConnectionStringBuilder();
-            CSL.DependencyInjection.SslModeConverter = (x) => (Npgsql.SslMode)x;
+            CSL.DependencyInjection.SslModeConverter = (x) => Enum.Parse(typeof(Npgsql.SslMode), x.ToString());
             PostgreSQL.TrustAllServerCertificates = true;
         }
         public static async Task<SQLDB> GetSQL() => await PostgreSQL.Connect

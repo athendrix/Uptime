@@ -12,6 +12,6 @@ namespace UptimeServer.Controllers
     public class LiveController : ControllerBase
     {
         [HttpGet]
-        public bool Get() => true;
+        public bool Get() => ServiceTracker.IsRunning;
     }
 }

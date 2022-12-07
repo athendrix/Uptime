@@ -24,6 +24,8 @@ RUN dotnet publish -c Release -o /app/publish
 FROM alpine:latest AS final
 RUN apk add aspnetcore6-runtime
 WORKDIR /app
+ENV ASPNETCORE_URLS=http://0.0.0.0:80
 EXPOSE 80
+COPY --from=client-build /home/bridge/projects/app/client.htmlz /client.htmlz
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "UptimeServer.dll"]

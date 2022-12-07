@@ -13,6 +13,7 @@ namespace UptimeServer
     {
         public static void Main(string[] args)
         {
+            ServiceTracker.Start();
             CreateHostBuilder(args).Build().Run();
         }
 
