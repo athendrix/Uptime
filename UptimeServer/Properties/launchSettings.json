@@ -2,13 +2,21 @@
   "iisSettings": {
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
-    "iisExpress": {}
+    "iisExpress": {
+      "sslPort": 0
+    }
   },
   "profiles": {
     "Docker": {
       "commandName": "Docker",
       "launchBrowser": true,
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
+      "environmentVariables": {
+        "USERNAME": "testuser",
+        "SERVER": "172.17.0.5",
+        "DATABASE": "testdb",
+        "PASSWORD": "testpassword"
+      },
       "publishAllPorts": true
     }
   }

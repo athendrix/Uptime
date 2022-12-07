@@ -5,12 +5,13 @@ RUN bridge build -c Debug                   && \
 cp -R -f ./wwwroot/* ./dist ;                \
 cd dist && zip -r -o -1 ../client.htmlz *
 
-FROM mcr.microsoft.com/dotnet/aspnet:5.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/aspnet:6.0-alpine AS base
 WORKDIR /app
 EXPOSE 80
 COPY --from=client-build /home/bridge/projects/app/client.htmlz /client.htmlz
 
-FROM mcr.microsoft.com/dotnet/sdk:5.0-alpine AS build
+FROM alpine:latest AS build
+RUN apk add dotnet6-sdk
 WORKDIR /src
 COPY ["./UptimeServer/*.csproj", "./"]
 RUN dotnet restore

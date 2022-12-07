@@ -1,0 +1,13 @@
+﻿[Metadata]
+Table Name = Services
+Namespace = UptimeServer.Data
+Primary Keys = 1
+
+[Columns]
+Name = string
+Address = string
+External = bool
+Backend = string?
+DisplayAddress = string?
+TrustCertificate = bool
+CheckType = Enum

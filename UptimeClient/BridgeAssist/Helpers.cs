@@ -61,6 +61,30 @@ namespace BridgeAssist
                 request.Send();
             });
         }
+        public static Task<bool> Check(string url)
+        {
+            return MakePromise<bool>((Resolve, Reject) =>
+            {
+                XMLHttpRequest request = new XMLHttpRequest();
+                request.OnReadyStateChange = () =>
+                {
+                    if (request.ReadyState != AjaxReadyState.Done)
+                    {
+                        return;
+                    }
+                    if (((request.Status == 200) || (request.Status == 304)))
+                    {
+                        Resolve(true);
+                    }
+                    else
+                    {
+                        Resolve(false);
+                    }
+                };
+                request.Open("GET", url, true);
+                request.Send();
+            });
+        }
         public static Task<T> Post<T,U>(string url, U data, string username = "", string password = "")
         {
             return MakePromise<T>((Resolve, Reject) =>
