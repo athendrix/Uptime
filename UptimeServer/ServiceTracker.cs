@@ -19,84 +19,119 @@ namespace UptimeServer
     public static class ServiceTracker
     {
         public static bool IsRunning => ServiceTrackingTask.Status == TaskStatus.Running;
-        public static void Restart() => ServiceTrackingTask = CheckServices();
-        public static void Start() { if (!IsRunning) { Restart(); } }
+        public static void Start()
+        {
+            if (!IsRunning)
+            {
+                Task TestStart = CheckServices();
+                if(TestStart.Status == TaskStatus.Running)
+                {
+                    ServiceTrackingTask = TestStart;
+                }
+            }
+        }
         public static void Reset() => resetServices = true;
         public static ReadOnlyMemory<WebService> GetServices() => WebServices.AsMemory();
 
-        
+        private static object lockobject = new object();
+        private static bool locked = false;
         private static bool resetServices = true;
         private static WebService[] WebServices = new WebService[0];
         private static Task ServiceTrackingTask = CheckServices();
         private static async Task CheckServices()
         {
-            DateTime Now;
-            while (true)
+            bool havelock;
+            lock (lockobject)
             {
-                Now = DateTime.UtcNow;
-                if (resetServices)
+                if (!locked)
                 {
+                    locked = true;
+                    havelock = true;
+                }
+                else
+                {
+                    havelock = false;
+                }
+            }
+            if (!havelock) { return; }
+            try
+            {
+                DateTime Now;
+                while (true)
+                {
+                    Now = DateTime.UtcNow;
+                    if (resetServices)
+                    {
+                        try
+                        {
+                            using (SQLDB sql = await PostgresServer.GetSQL())
+                            {
+                                await Services.CreateDB(sql);
+                                using (AutoClosingEnumerable<Services> DBServices = await Services.Select(sql))
+                                {
+                                    WebServices = DBServices.Select(x => new WebService(x)).ToArray();
+                                }
+                            }
+                            resetServices = false;
+                        }
+                        catch (Exception e)
+                        {
+                            Console.Error.WriteLine(e.ToString());
+                        }
+                    }
                     try
                     {
-                        using (SQLDB sql = await PostgresServer.GetSQL())
+                        Task<WebService>[] CheckResults = new Task<WebService>[WebServices.Length];
+                        for (int i = 0; i < WebServices.Length; i++)
                         {
-                            await Services.CreateDB(sql);
-                            using (AutoClosingEnumerable<Services> DBServices = await Services.Select(sql))
+                            CheckResults[i] = WebServices[i].checktype switch
                             {
-                                WebServices = DBServices.Select(x => new WebService(x)).ToArray();
-                            }
+                                CheckType.PING => CheckPING(WebServices[i], Now),
+                                CheckType.TCP => CheckTCP(WebServices[i], Now),
+                                CheckType.SSL => CheckSSL(WebServices[i], Now),
+                                CheckType.HTTP => CheckHTTP(WebServices[i], Now),
+                                _ => throw new NotImplementedException(),
+                            };
                         }
-                        resetServices = false;
+                        await Task.WhenAll(CheckResults);
+                        for (int i = 0; i < WebServices.Length; i++)
+                        {
+                            WebService webService = WebServices[i];
+                            WebService result = CheckResults[i].Result;
+                            bool oldstate = !(webService.checktime == DateTime.MaxValue);
+                            bool state = !(result.checktime == DateTime.MaxValue);
+
+                            if (MattermostLogger.DefaultLogger != null &&
+                                webService.name == result.name &&
+                                !webService.live.Contains("UNTESTED") &&
+                                !result.live.Contains("UNTESTED") &&
+                                state != oldstate)
+                            {
+                                try
+                                {
+                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}");
+                                }
+                                catch { }
+                            }
+                            WebServices[i] = result;
+                        }
+                        //WebServices = CheckResults.Select(x => x.Result).ToArray();
                     }
                     catch (Exception e)
                     {
                         Console.Error.WriteLine(e.ToString());
                     }
+                    Now = DateTime.UtcNow;
+                    await Task.Delay(30000 - (((Now.Second * 1000) + Now.Millisecond) % 30000));
                 }
-                try
-                {
-                    Task<WebService>[] CheckResults = new Task<WebService>[WebServices.Length];
-                    for(int i = 0; i < WebServices.Length; i++)
-                    {
-                        CheckResults[i] = WebServices[i].checktype switch
-                        {
-                            CheckType.PING => CheckPING(WebServices[i], Now),
-                            CheckType.TCP => CheckTCP(WebServices[i], Now),
-                            CheckType.SSL => CheckSSL(WebServices[i], Now),
-                            CheckType.HTTP => CheckHTTP(WebServices[i], Now),
-                            _ => throw new NotImplementedException(),
-                        };
-                    }
-                    await Task.WhenAll(CheckResults);
-                    for(int i = 0; i < WebServices.Length; i++)
-                    {
-                        WebService webService = WebServices[i];
-                        WebService result = CheckResults[i].Result;
-                        if (MattermostLogger.DefaultLogger != null &&
-                            webService.name == result.name &&
-                            !webService.live.Contains("UNTESTED") &&
-                            !result.live.Contains("UNTESTED") &&
-                            WebServices[i].checktime != result.checktime)
-                        {
-                            bool state = !result.checktime.Equals(DateTime.MaxValue);
-                            try
-                            {
-                                await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!":"has gone down! @ahendrix")}");
-                            }
-                            catch { }
-                        }
-                        WebServices[i] = result;
-                    }
-                    WebServices = CheckResults.Select(x => x.Result).ToArray();
-                }
-                catch (Exception e)
-                {
-                    Console.Error.WriteLine(e.ToString());
-                }
-                Now = DateTime.UtcNow;
-                await Task.Delay(30000 - (((Now.Second * 1000) + Now.Millisecond) % 30000));
             }
-
+            finally
+            {
+                lock(lockobject)
+                {
+                    locked = false;
+                }
+            }
         }
 #warning Simplify Error Reporting
         private static async Task<WebService> CheckHTTP(WebService service, DateTime Now)

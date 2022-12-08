@@ -30,7 +30,7 @@ namespace UptimeServer.Controllers
                 await Task.Delay(100);
                 toReturn = ServiceTracker.GetServices();
             }
-            return toReturn.ToArray().OrderBy((srv) => srv.checktime).ThenBy((srv) => srv.name);
+            return toReturn.ToArray().OrderBy((srv) => srv.checktime == DateTime.MaxValue).ThenBy((srv) => srv.name);
             
         }
 

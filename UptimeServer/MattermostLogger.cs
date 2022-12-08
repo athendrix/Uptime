@@ -20,7 +20,7 @@ namespace UptimeServer
             string strcontent;
             if (card == null)
             {
-                strcontent = $"{{\"text\":\"{SanitizeJSON(message)}\"";
+                strcontent = $"{{\"text\":\"{SanitizeJSON(message)}\"}}";
             }
             else
             {
