@@ -14,7 +14,7 @@ namespace UptimeServer
 {
     public record WebService(string name, string address, string? displayaddress, bool external, string? backend, string live, bool trustcert, CheckType checktype, DateTime checktime)
     {
-        public WebService(Services service) : this(service.Name, service.Address, service.DisplayAddress, service.External, service.Backend, "*UNTESTED*", service.TrustCertificate, service.CheckType, DateTime.MaxValue) {}
+        public WebService(Services service) : this(service.Name, service.Address, service.DisplayAddress, service.External, service.Backend, "*UNTESTED*", service.TrustCertificate, service.CheckType, DateTime.MaxValue) { }
     }
     public static class ServiceTracker
     {
@@ -24,7 +24,7 @@ namespace UptimeServer
             if (!IsRunning)
             {
                 Task TestStart = CheckServices();
-                if(TestStart.Status == TaskStatus.Running)
+                if (TestStart.Status == TaskStatus.Running)
                 {
                     ServiceTrackingTask = TestStart;
                 }
@@ -82,7 +82,8 @@ namespace UptimeServer
                     try
                     {
                         Task<WebService>[] CheckResults = new Task<WebService>[WebServices.Length];
-                        for (int i = 0; i < WebServices.Length; i++)
+                        ParallelOptions po = new ParallelOptions() { MaxDegreeOfParallelism = 5 };
+                        Parallel.For(0, WebServices.Length, po, (i,x) =>
                         {
                             CheckResults[i] = WebServices[i].checktype switch
                             {
@@ -92,7 +93,7 @@ namespace UptimeServer
                                 CheckType.HTTP => CheckHTTP(WebServices[i], Now),
                                 _ => throw new NotImplementedException(),
                             };
-                        }
+                        });
                         await Task.WhenAll(CheckResults);
                         for (int i = 0; i < WebServices.Length; i++)
                         {
@@ -127,7 +128,7 @@ namespace UptimeServer
             }
             finally
             {
-                lock(lockobject)
+                lock (lockobject)
                 {
                     locked = false;
                 }
@@ -212,40 +213,45 @@ namespace UptimeServer
         }
         private static async Task<WebService> CheckTCP(WebService service, DateTime Now)
         {
-            using (TcpClient client = new TcpClient())
+
+            try
             {
-                try
+                string[] hostport = service.address.Split(":");
+                int port;
+                if (hostport.Length != 2 || !int.TryParse(hostport[1], out port))
                 {
-                    string[] hostport = service.address.Split(":");
-                    int port;
-                    if (hostport.Length != 2 || !int.TryParse(hostport[1], out port))
-                    {
-                        return service with { live = "Error:Invalid address", checktime = DateTime.MaxValue };
-                    }
+                    return service with { live = "Error:Invalid address", checktime = DateTime.MaxValue };
+                }
+                for (int i = 0; i < 4; i++)
+                {
                     CancellationTokenSource onesecond = new CancellationTokenSource();
-                    Task TCPConnection = client.ConnectAsync(hostport[0], port, onesecond.Token).AsTask();
-                    await Task.WhenAny(Task.Delay(1000), TCPConnection);
-                    if (TCPConnection.IsCompletedSuccessfully)
+                    using (TcpClient client = new TcpClient())
                     {
-                        bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
-                        return service with { live = "OK", checktime = prev ? Now : service.checktime };
+                        Task TCPConnection = client.ConnectAsync(hostport[0], port, onesecond.Token).AsTask();
+                        await Task.WhenAny(Task.Delay(1000), TCPConnection);
+                        if (TCPConnection.IsCompletedSuccessfully)
+                        {
+                            bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
+                            return service with { live = "OK", checktime = prev ? Now : service.checktime };
+                        }
+                        if (TCPConnection.IsFaulted)
+                        {
+                            Console.Error.WriteLine("Error for Service " + service.name);
+                            Console.Error.WriteLine(TCPConnection.Exception?.ToString());
+                            return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                        }
+                        onesecond.Cancel();
                     }
-                    if (TCPConnection.IsFaulted)
-                    {
-                        Console.Error.WriteLine("Error for Service " + service.name);
-                        Console.Error.WriteLine(TCPConnection.Exception?.ToString());
-                        return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
-                    }
-                    onesecond.Cancel();
-                    return service with { live = "Error:Timeout", checktime = DateTime.MaxValue };
                 }
-                catch (Exception e)
-                {
-                    Console.Error.WriteLine("Error for Service " + service.name);
-                    Console.Error.WriteLine(e.ToString());
-                    return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
-                }
+                return service with { live = "Error:Timeout", checktime = DateTime.MaxValue };
             }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine("Error for Service " + service.name);
+                Console.Error.WriteLine(e.ToString());
+                return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+            }
+
         }
     }
 }
