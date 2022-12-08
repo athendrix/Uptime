@@ -68,6 +68,25 @@ namespace UptimeServer
                         };
                     }
                     await Task.WhenAll(CheckResults);
+                    for(int i = 0; i < WebServices.Length; i++)
+                    {
+                        WebService webService = WebServices[i];
+                        WebService result = CheckResults[i].Result;
+                        if (MattermostLogger.DefaultLogger != null &&
+                            webService.name == result.name &&
+                            !webService.live.Contains("UNTESTED") &&
+                            !result.live.Contains("UNTESTED") &&
+                            WebServices[i].checktime != result.checktime)
+                        {
+                            bool state = !result.checktime.Equals(DateTime.MaxValue);
+                            try
+                            {
+                                await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!":"has gone down! @ahendrix")}");
+                            }
+                            catch { }
+                        }
+                        WebServices[i] = result;
+                    }
                     WebServices = CheckResults.Select(x => x.Result).ToArray();
                 }
                 catch (Exception e)
