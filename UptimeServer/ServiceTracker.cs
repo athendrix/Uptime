@@ -110,7 +110,7 @@ namespace UptimeServer
                             {
                                 try
                                 {
-                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}");
+                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}",webService.live);
                                 }
                                 catch { }
                             }
@@ -144,43 +144,58 @@ namespace UptimeServer
             }
             using (HttpClient client = new HttpClient(handler))
             {
-                try
+                WebService toReturn = service;
+                for (int i = 0; i < 4; i++)
                 {
-                    HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Head, service.address);
-                    HttpResponseMessage response = await client.SendAsync(message);
-                    bool ok = response.StatusCode == System.Net.HttpStatusCode.OK;
-                    bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
-                    return service with { live = (ok ? "" : "Error:") + response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = ok ? (prev ? Now : service.checktime) : DateTime.MaxValue };
-                }
-                catch (HttpRequestException hre)
-                {
-                    if (hre.InnerException is AuthenticationException ae)
+                    try
                     {
-                        return service with { live = "Error:TLS/Certificate", checktime = DateTime.MaxValue };
+                        HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Head, service.address);
+                        HttpResponseMessage response = await client.SendAsync(message);
+                        bool ok = response.StatusCode == System.Net.HttpStatusCode.OK;
+                        bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
+                        if(ok)
+                        {
+                            return service with { live = response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = prev ? Now : service.checktime };
+                        }
+                        toReturn = service with { live =  "Error:" + response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = DateTime.MaxValue };
                     }
-                    if (hre.Message.Contains("Connection refused"))
+                    catch (HttpRequestException hre)
                     {
-                        return service with { live = "Error:Connection Refused", checktime = DateTime.MaxValue };
+                        if (hre.InnerException is AuthenticationException ae)
+                        {
+                            toReturn = service with { live = "Error:TLS/Certificate", checktime = DateTime.MaxValue };
+                            continue;
+                        }
+                        if (hre.Message.Contains("Connection refused"))
+                        {
+                            toReturn = service with { live = "Error:Connection Refused", checktime = DateTime.MaxValue };
+                            continue;
+                        }
+                        if (hre.Message.Contains("Name does not resolve"))
+                        {
+                            toReturn = service with { live = "Error:DNS", checktime = DateTime.MaxValue };
+                            continue;
+                        }
+                        Console.Error.WriteLine("----------------------------------------------------------");
+                        Console.Error.WriteLine("Error for Service " + service.name);
+                        Console.Error.WriteLine(hre.Message);
+                        Console.Error.WriteLine("Status Code: " + (int)hre.StatusCode.GetValueOrDefault());
+                        Console.Error.WriteLine("----------------------------------------------------------");
+                        Console.Error.WriteLine(hre.ToString());
+                        Console.Error.WriteLine("----------------------------------------------------------");
+                        toReturn = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                        continue;
                     }
-                    if (hre.Message.Contains("Name does not resolve"))
+                    catch (Exception e)
                     {
-                        return service with { live = "Error:DNS", checktime = DateTime.MaxValue };
+                        Console.Error.WriteLine("Error for Service " + service.name);
+                        Console.Error.WriteLine(e.ToString());
+                        toReturn = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                        continue;
                     }
-                    Console.Error.WriteLine("----------------------------------------------------------");
-                    Console.Error.WriteLine("Error for Service " + service.name);
-                    Console.Error.WriteLine(hre.Message);
-                    Console.Error.WriteLine("Status Code: " + (int)hre.StatusCode.GetValueOrDefault());
-                    Console.Error.WriteLine("----------------------------------------------------------");
-                    Console.Error.WriteLine(hre.ToString());
-                    Console.Error.WriteLine("----------------------------------------------------------");
-                    return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                    await Task.Delay(1000);
                 }
-                catch (Exception e)
-                {
-                    Console.Error.WriteLine("Error for Service " + service.name);
-                    Console.Error.WriteLine(e.ToString());
-                    return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
-                }
+                return toReturn;
             }
         }
         private static async Task<WebService> CheckPING(WebService service, DateTime Now)
