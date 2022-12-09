@@ -144,7 +144,8 @@ namespace UptimeServer
             }
             using (HttpClient client = new HttpClient(handler))
             {
-                WebService toReturn = service;
+                WebService? serverError = null;
+                WebService clientError = service;
                 for (int i = 0; i < 4; i++)
                 {
                     try
@@ -157,23 +158,23 @@ namespace UptimeServer
                         {
                             return service with { live = response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = prev ? Now : service.checktime };
                         }
-                        toReturn = service with { live =  "Error:" + response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = DateTime.MaxValue };
+                        serverError = service with { live =  "Error:" + response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = DateTime.MaxValue };
                     }
                     catch (HttpRequestException hre)
                     {
                         if (hre.InnerException is AuthenticationException ae)
                         {
-                            toReturn = service with { live = "Error:TLS/Certificate", checktime = DateTime.MaxValue };
+                            clientError = service with { live = "Error:TLS/Certificate", checktime = DateTime.MaxValue };
                             continue;
                         }
                         if (hre.Message.Contains("Connection refused"))
                         {
-                            toReturn = service with { live = "Error:Connection Refused", checktime = DateTime.MaxValue };
+                            clientError = service with { live = "Error:Connection Refused", checktime = DateTime.MaxValue };
                             continue;
                         }
                         if (hre.Message.Contains("Name does not resolve"))
                         {
-                            toReturn = service with { live = "Error:DNS", checktime = DateTime.MaxValue };
+                            clientError = service with { live = "Error:DNS", checktime = DateTime.MaxValue };
                             continue;
                         }
                         Console.Error.WriteLine("----------------------------------------------------------");
@@ -183,19 +184,19 @@ namespace UptimeServer
                         Console.Error.WriteLine("----------------------------------------------------------");
                         Console.Error.WriteLine(hre.ToString());
                         Console.Error.WriteLine("----------------------------------------------------------");
-                        toReturn = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                        clientError = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
                         continue;
                     }
                     catch (Exception e)
                     {
                         Console.Error.WriteLine("Error for Service " + service.name);
                         Console.Error.WriteLine(e.ToString());
-                        toReturn = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                        clientError = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
                         continue;
                     }
                     await Task.Delay(1000);
                 }
-                return toReturn;
+                return serverError ?? clientError;
             }
         }
         private static async Task<WebService> CheckPING(WebService service, DateTime Now)
