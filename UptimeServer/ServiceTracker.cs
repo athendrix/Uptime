@@ -112,7 +112,7 @@ namespace UptimeServer
                             {
                                 try
                                 {
-                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}", webService.live + "\n" + webService.errorText);
+                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}", result.live + "\n\n---\n\n" + result.errorText);
                                 }
                                 catch { }
                             }
@@ -229,7 +229,7 @@ namespace UptimeServer
                 int port;
                 if (hostport.Length != 2 || !int.TryParse(hostport[1], out port))
                 {
-                    return service with { live = "Error:Invalid address", checktime = DateTime.MaxValue };
+                    return service with { live = "Error:Invalid address", checktime = DateTime.MaxValue, errorText = null };
                 }
                 for (int i = 0; i < 4; i++)
                 {
@@ -241,7 +241,7 @@ namespace UptimeServer
                         if (TCPConnection.IsCompletedSuccessfully)
                         {
                             bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
-                            return service with { live = "OK", checktime = prev ? Now : service.checktime };
+                            return service with { live = "OK", checktime = prev ? Now : service.checktime, errorText = null };
                         }
                         if (TCPConnection.IsFaulted)
                         {
@@ -250,7 +250,7 @@ namespace UptimeServer
                         onesecond.Cancel();
                     }
                 }
-                return service with { live = "Error:Timeout", checktime = DateTime.MaxValue };
+                return service with { live = "Error:Timeout", checktime = DateTime.MaxValue, errorText = null };
             }
             catch (Exception e)
             {
