@@ -2,22 +2,25 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UptimeServer.Data;
 
 namespace UptimeServer
 {
-    public record WebService(string name, string address, string? displayaddress, bool external, string? backend, string live, bool trustcert, CheckType checktype, DateTime checktime)
+    public record WebService(string name, string address, string? displayaddress, bool external, string? backend, string live, bool trustcert, CheckType checktype, DateTime checktime, string? errorText)
     {
-        public WebService(Services service) : this(service.Name, service.Address, service.DisplayAddress, service.External, service.Backend, "*UNTESTED*", service.TrustCertificate, service.CheckType, DateTime.MaxValue) { }
+        public WebService(Services service) : this(service.Name, service.Address, service.DisplayAddress, service.External, service.Backend, "*UNTESTED*", service.TrustCertificate, service.CheckType, DateTime.MaxValue, null) { }
     }
     public static class ServiceTracker
     {
+        private static FastHTTPChecker httpChecker = new FastHTTPChecker(2000);
         public static bool IsRunning => ServiceTrackingTask.Status == TaskStatus.Running;
         public static void Start()
         {
@@ -82,8 +85,7 @@ namespace UptimeServer
                     try
                     {
                         Task<WebService>[] CheckResults = new Task<WebService>[WebServices.Length];
-                        ParallelOptions po = new ParallelOptions() { MaxDegreeOfParallelism = 5 };
-                        Parallel.For(0, WebServices.Length, po, (i,x) =>
+                        for(int i = 0; i < WebServices.Length; i++)
                         {
                             CheckResults[i] = WebServices[i].checktype switch
                             {
@@ -93,7 +95,7 @@ namespace UptimeServer
                                 CheckType.HTTP => CheckHTTP(WebServices[i], Now),
                                 _ => throw new NotImplementedException(),
                             };
-                        });
+                        }
                         await Task.WhenAll(CheckResults);
                         for (int i = 0; i < WebServices.Length; i++)
                         {
@@ -110,7 +112,7 @@ namespace UptimeServer
                             {
                                 try
                                 {
-                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}",webService.live);
+                                    await MattermostLogger.DefaultLogger.SendMessage($"Service {webService.name} {(state ? "is now up!" : "has gone down! @ahendrix")}", webService.live + "\n" + webService.errorText);
                                 }
                                 catch { }
                             }
@@ -122,6 +124,7 @@ namespace UptimeServer
                     {
                         Console.Error.WriteLine(e.ToString());
                     }
+                    Console.WriteLine($"Elapsed Time for Cycle: {(DateTime.UtcNow - Now).TotalSeconds} seconds.");
                     Now = DateTime.UtcNow;
                     await Task.Delay(30000 - (((Now.Second * 1000) + Now.Millisecond) % 30000));
                 }
@@ -137,67 +140,59 @@ namespace UptimeServer
 #warning Simplify Error Reporting
         private static async Task<WebService> CheckHTTP(WebService service, DateTime Now)
         {
-            HttpClientHandler handler = new HttpClientHandler();
-            if (service.trustcert)
+            WebService? serverError = null;
+            WebService clientError = service;
+            for (int i = 0; i < 4; i++)
             {
-                handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-            }
-            using (HttpClient client = new HttpClient(handler))
-            {
-                WebService? serverError = null;
-                WebService clientError = service;
-                for (int i = 0; i < 4; i++)
+                try
                 {
-                    try
+                    int response = await httpChecker.CheckAsync(service.address, service.trustcert);
+                    switch (response)
                     {
-                        HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Head, service.address);
-                        HttpResponseMessage response = await client.SendAsync(message);
-                        bool ok = response.StatusCode == System.Net.HttpStatusCode.OK;
-                        bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
-                        if(ok)
-                        {
-                            return service with { live = response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = prev ? Now : service.checktime };
-                        }
-                        serverError = service with { live =  "Error:" + response.StatusCode.ToString() + ":" + ((int)response.StatusCode).ToString(), checktime = DateTime.MaxValue };
+                        case -1:
+                            clientError = service with { live = "Error:TLS/Certificate", checktime = DateTime.MaxValue, errorText = null };
+                            continue;
+                        case -2:
+                            clientError = service with { live = "Error:Connection Refused", checktime = DateTime.MaxValue, errorText = null };
+                            continue;
+                        case -3:
+                            clientError = service with { live = "Error:DNS", checktime = DateTime.MaxValue, errorText = null };
+                            continue;
+                        case -4:
+                            clientError = service with { live = "Error:No Response", checktime = DateTime.MaxValue, errorText = null };
+                            continue;
                     }
-                    catch (HttpRequestException hre)
+                    HttpStatusCode StatusCode = (HttpStatusCode)response;
+                    bool ok = StatusCode == HttpStatusCode.OK;
+                    bool prev = service.live.Contains("Error:") || service.live.Contains("UNTESTED");
+                    if (ok)
                     {
-                        if (hre.InnerException is AuthenticationException ae)
-                        {
-                            clientError = service with { live = "Error:TLS/Certificate", checktime = DateTime.MaxValue };
-                            continue;
-                        }
-                        if (hre.Message.Contains("Connection refused"))
-                        {
-                            clientError = service with { live = "Error:Connection Refused", checktime = DateTime.MaxValue };
-                            continue;
-                        }
-                        if (hre.Message.Contains("Name does not resolve"))
-                        {
-                            clientError = service with { live = "Error:DNS", checktime = DateTime.MaxValue };
-                            continue;
-                        }
-                        Console.Error.WriteLine("----------------------------------------------------------");
-                        Console.Error.WriteLine("Error for Service " + service.name);
-                        Console.Error.WriteLine(hre.Message);
-                        Console.Error.WriteLine("Status Code: " + (int)hre.StatusCode.GetValueOrDefault());
-                        Console.Error.WriteLine("----------------------------------------------------------");
-                        Console.Error.WriteLine(hre.ToString());
-                        Console.Error.WriteLine("----------------------------------------------------------");
-                        clientError = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
-                        continue;
+                        return service with { live = $"{StatusCode}:{response}", checktime = prev ? Now : service.checktime, errorText = null };
                     }
-                    catch (Exception e)
-                    {
-                        Console.Error.WriteLine("Error for Service " + service.name);
-                        Console.Error.WriteLine(e.ToString());
-                        clientError = service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
-                        continue;
-                    }
-                    await Task.Delay(1000);
+                    serverError = service with { live = $"Error:{StatusCode}:{response}", checktime = DateTime.MaxValue, errorText = null};
                 }
-                return serverError ?? clientError;
+                catch (HttpRequestException hre)
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine("Unrecognized error for Service " + service.name);
+                    sb.AppendLine(hre.Message);
+                    sb.AppendLine("Status Code: " + (int)hre.StatusCode.GetValueOrDefault());
+                    sb.AppendLine("---");
+                    sb.AppendLine(hre.ToString());
+                    clientError = service with { live = "Error:Exception!", checktime = DateTime.MaxValue, errorText = sb.ToString() };
+                    continue;
+                }
+                catch (Exception e)
+                {
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine("Error for Service " + service.name);
+                    sb.AppendLine(e.ToString());
+                    clientError = service with { live = "Error:Exception!", checktime = DateTime.MaxValue, errorText = sb.ToString() };
+                    continue;
+                }
             }
+            return serverError ?? clientError;
+
         }
         private static async Task<WebService> CheckPING(WebService service, DateTime Now)
         {
@@ -217,9 +212,7 @@ namespace UptimeServer
                 }
                 catch (Exception e)
                 {
-                    Console.Error.WriteLine("Error for Service " + service.name);
-                    Console.Error.WriteLine(e.ToString());
-                    return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                    return service with { live = "Error:Exception!", checktime = DateTime.MaxValue, errorText = e.ToString() };
                 }
             }
         }
@@ -252,9 +245,7 @@ namespace UptimeServer
                         }
                         if (TCPConnection.IsFaulted)
                         {
-                            Console.Error.WriteLine("Error for Service " + service.name);
-                            Console.Error.WriteLine(TCPConnection.Exception?.ToString());
-                            return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                            return service with { live = "Error:Exception!", checktime = DateTime.MaxValue, errorText = TCPConnection.Exception?.ToString() };
                         }
                         onesecond.Cancel();
                     }
@@ -263,9 +254,7 @@ namespace UptimeServer
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine("Error for Service " + service.name);
-                Console.Error.WriteLine(e.ToString());
-                return service with { live = "Error:Exception!", checktime = DateTime.MaxValue };
+                return service with { live = "Error:Exception!", checktime = DateTime.MaxValue, errorText = e.Message };
             }
 
         }
