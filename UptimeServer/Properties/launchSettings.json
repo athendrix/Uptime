@@ -13,11 +13,22 @@
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
       "environmentVariables": {
         "USERNAME": "testuser",
+        "PASSWORD": "testpassword",
         "SERVER": "172.17.0.5",
         "DATABASE": "testdb",
-        "PASSWORD": "testpassword"
+        "WEBHOOK": "https://mattermost.domain.com/hooks/abcdwebhookkeyxyz"
       },
       "publishAllPorts": true
+    },
+    "Profile 1": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "USERNAME": "testuser",
+        "PASSWORD": "testpassword",
+        "SERVER": "127.0.0.1",
+        "DATABASE": "testdb",
+        "WEBHOOK": "https://mattermost.domain.com/hooks/abcdwebhookkeyxyz"
+      }
     }
   }
 }
