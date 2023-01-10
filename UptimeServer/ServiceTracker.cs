@@ -12,6 +12,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using UptimeServer.Data;
 
+using static UptimeServer.AsyncLocker;
+
 namespace UptimeServer
 {
     public record WebService(string name, string address, string? displayaddress, bool external, string? backend, string live, bool trustcert, CheckType checktype, DateTime checktime, string? errorText)
@@ -37,27 +39,13 @@ namespace UptimeServer
         public static ReadOnlyMemory<WebService> GetServices() => WebServices.AsMemory();
 
         private static object lockobject = new object();
-        private static bool locked = false;
         private static bool resetServices = true;
+        
         private static WebService[] WebServices = new WebService[0];
         private static Task ServiceTrackingTask = CheckServices();
         private static async Task CheckServices()
         {
-            bool havelock;
-            lock (lockobject)
-            {
-                if (!locked)
-                {
-                    locked = true;
-                    havelock = true;
-                }
-                else
-                {
-                    havelock = false;
-                }
-            }
-            if (!havelock) { return; }
-            try
+            await TryLock(lockobject, async () =>
             {
                 DateTime Now;
                 while (true)
@@ -85,16 +73,9 @@ namespace UptimeServer
                     try
                     {
                         Task<WebService>[] CheckResults = new Task<WebService>[WebServices.Length];
-                        for(int i = 0; i < WebServices.Length; i++)
+                        for (int i = 0; i < WebServices.Length; i++)
                         {
-                            CheckResults[i] = WebServices[i].checktype switch
-                            {
-                                CheckType.PING => CheckPING(WebServices[i], Now),
-                                CheckType.TCP => CheckTCP(WebServices[i], Now),
-                                CheckType.SSL => CheckSSL(WebServices[i], Now),
-                                CheckType.HTTP => CheckHTTP(WebServices[i], Now),
-                                _ => throw new NotImplementedException(),
-                            };
+                            CheckResults[i] = Check(WebServices[i], Now);
                         }
                         await Task.WhenAll(CheckResults);
                         for (int i = 0; i < WebServices.Length; i++)
@@ -128,16 +109,17 @@ namespace UptimeServer
                     Now = DateTime.UtcNow;
                     await Task.Delay(30000 - (((Now.Second * 1000) + Now.Millisecond) % 30000));
                 }
-            }
-            finally
-            {
-                lock (lockobject)
-                {
-                    locked = false;
-                }
-            }
+            });
         }
 #warning Simplify Error Reporting
+        private static Task<WebService> Check(WebService service, DateTime Now) => service.checktype switch
+        {
+            CheckType.PING => CheckPING(service, Now),
+            CheckType.TCP => CheckTCP(service, Now),
+            CheckType.SSL => CheckSSL(service, Now),
+            CheckType.HTTP => CheckHTTP(service, Now),
+            _ => throw new NotImplementedException(),
+        };
         private static async Task<WebService> CheckHTTP(WebService service, DateTime Now)
         {
             WebService? serverError = null;
