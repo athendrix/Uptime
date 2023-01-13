@@ -1,0 +1,73 @@
+﻿@using Uptime.Shared;
+@using Newtonsoft.Json
+
+@inject HttpClient Http;
+@page "/"
+
+<h1>Services</h1>
+
+<table style="width: 100%">
+    <tr>
+        <th>Service</th>
+        <th>Address</th>
+        <th>Backend</th>
+        <th>Internal/External</th>
+        <th>Status</th>
+        <th>Uptime</th>
+    </tr>
+    @if (_services is not null)
+    {
+        @foreach (ServiceRecord service in _services)
+        {
+            <tr>
+                <td>@service.Name</td>
+                @if (service.Address.StartsWith("http") || service.Address.StartsWith("https://"))
+                {
+                    string lockSymbol = service.Address.StartsWith("https") ? "🔐" : "☠️";
+                    <td>@lockSymbol <a href="@service.Address">@service.Address</a></td>
+                }
+                else
+                {
+                    <td>@service.Address</td>
+                }
+                <td style="min-width: auto">@service.Backend</td>
+                @{ string internalExternal = service.External ? "External" : "Internal"; }
+                <td>@internalExternal</td>
+                <td>@service.Live</td>
+                @if (service.Live.ToLower().Contains("ok"))
+                {
+                    <td>@FormatUptime(service.CheckTime.Ticks)</td>
+                }
+            </tr>
+        }
+    }
+    else
+    {
+        <p>Loading...</p>
+    }
+</table>
+
+@code {
+    private static List<ServiceRecord>? _services;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _services = await Http.GetFromJsonAsync<List<ServiceRecord>?>("api/ServiceList");
+    }
+    
+    private static string FormatUptime(long ticks)
+    {
+        long seconds = (DateTime.Now.Ticks - ticks)/10000000;
+        long days = seconds / (60 * 60 * 24);
+        seconds %= (60 * 60 * 24);
+        long hours = seconds / (60 * 60);
+        seconds %= (60 * 60);
+        long minutes = seconds / 60;
+        seconds %= 60;
+        string dayPart = days > 0 ? days + (days == 1 ? " Day ":" Days ") : "";
+        string hourPart = hours > 0 ? hours + (hours == 1 ?" Hour ":" Hours ") : "";
+        string minutePart = minutes > 0 ? minutes + (minutes == 1 ? " Minute " : " Minutes ") : "";
+        return  dayPart + hourPart + minutePart + seconds + (seconds == 1 ? " Second" : " Seconds");
+    }
+
+}

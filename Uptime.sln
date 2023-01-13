@@ -1,20 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.2.32526.322
+VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UptimeClient", "UptimeClient\UptimeClient.csproj", "{6328C93C-B09F-4C89-AF37-6F0402387083}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uptime.Server", "Uptime\Server\Uptime.Server.csproj", "{E1FBEC24-EC40-45B8-9E6E-B4C8EA824051}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UptimeServer", "UptimeServer\UptimeServer.csproj", "{A260E898-6C21-440A-B123-99A71EAA3D3F}"
-	ProjectSection(ProjectDependencies) = postProject
-		{6328C93C-B09F-4C89-AF37-6F0402387083} = {6328C93C-B09F-4C89-AF37-6F0402387083}
-	EndProjectSection
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uptime.Client", "Uptime\Client\Uptime.Client.csproj", "{D8E08000-7211-431C-B9F6-8AE1DB647C6F}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1957CFFD-928F-4796-BEE5-B2946B9332A4}"
-	ProjectSection(SolutionItems) = preProject
-		.gitlab-ci.yml = .gitlab-ci.yml
-		Dockerfile = Dockerfile
-	EndProjectSection
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uptime.Shared", "Uptime\Shared\Uptime.Shared.csproj", "{2F6ED162-B260-48C3-8A6A-90C944466E81}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -22,17 +15,23 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6328C93C-B09F-4C89-AF37-6F0402387083}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6328C93C-B09F-4C89-AF37-6F0402387083}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A260E898-6C21-440A-B123-99A71EAA3D3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1FBEC24-EC40-45B8-9E6E-B4C8EA824051}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1FBEC24-EC40-45B8-9E6E-B4C8EA824051}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1FBEC24-EC40-45B8-9E6E-B4C8EA824051}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1FBEC24-EC40-45B8-9E6E-B4C8EA824051}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8E08000-7211-431C-B9F6-8AE1DB647C6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8E08000-7211-431C-B9F6-8AE1DB647C6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8E08000-7211-431C-B9F6-8AE1DB647C6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8E08000-7211-431C-B9F6-8AE1DB647C6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F6ED162-B260-48C3-8A6A-90C944466E81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F6ED162-B260-48C3-8A6A-90C944466E81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F6ED162-B260-48C3-8A6A-90C944466E81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F6ED162-B260-48C3-8A6A-90C944466E81}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {84B20752-7ACC-4C85-93AB-C622CC2AFD38}
+		SolutionGuid = {CB8D4DF6-08B3-479E-BA4E-1381C4AB4A22}
 	EndGlobalSection
 EndGlobal
